@@ -1,14 +1,14 @@
 html, body { color: #434242; font-family: 'Roboto', sans-serif !important; height: 100%; }
-body { background: #F3EFE0; font-size: 20px; line-height: 1.64; }
+body { background: #F3EFE0; font-size: 18px; line-height: 1.64; }
 
 h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6, strong, b { font-family: 'Roboto', sans-serif !important; margin-bottom: 20px; }
-h1,h4 { font-weight: 700; margin-bottom: 10px; }
-h2,h3 { font-weight: 300; color: #3399FF; }
-h2 { font-size: 54px; text-align: center; }
-h3 { font-size: 32px; text-align: center;}
+h1 { font-size : 124px; text-align: left; color: #FFFFFF; font-weight: 700; margin-bottom: 10px; }
+h2 { font-size: 124px; text-align: right; color: #000000; font-weight: 700; margin-bottom: 10px; }
+h3 { font-size: 55px; text-align: center; }
+h4{  font-size: 33px; font-weight: 300; color: #3399FF; }
 
-p.lead { text-align: center; color: #000000; }
-p.lead2 { text-align: center; color: #FFFFFF; }
+p.lead { text-align: right; color: #000000; }
+p.lead2 { text-align: left; color: #FFFFFF; }
 p.lead a { color: #FFFFFF; text-decoration: underline; }
 p.lead a:hover { text-decoration: none; }
 ul.no-bullets { list-style-type: none; margin: 0px; padding: 0px; }
@@ -28,6 +28,8 @@ hr { margin: 40px 0px; border-color: #727878; opacity: 0.2; filter:alpha(opacity
 
 .background-darkgray { background: #222222; }
 .background-gray { background: #434242; }
+.background-white { background: #FFFFFF; }
+.background-black { background: #000000; }
 .background-blue { background: #0D47A1; }
 
 .icon { display: inline-block; background: url(images/sm_icon_sprite.png) no-repeat; height: 32px; width: 32px; }
