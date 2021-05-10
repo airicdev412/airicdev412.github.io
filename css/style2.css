@@ -3,7 +3,7 @@ body { background: #F3EFE0; font-size: 18px; line-height: 1.64; }
 
 h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6, strong, b { font-family: 'Roboto', sans-serif !important; margin-bottom: 20px; }
 h1 { font-size : 124px; text-align: left; color: #FFFFFF; font-weight: 700; margin-bottom: 10px; }
-h2 { font-size: 124px; text-align: right; color: #000000; font-weight: 700; margin-bottom: 10px; }
+h2 { font-size: 114px; text-align: right; color: #000000; font-weight: 700; margin-bottom: 10px; }
 h3 { font-size: 55px; text-align: center; }
 h4{ font-size: 33px; font-weight: 300; color: #3399FF; }
 
