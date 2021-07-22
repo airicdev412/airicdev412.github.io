@@ -1,0 +1,96 @@
+html, body { color: #FFFFFF; font-family: 'Roboto', sans-serif !important; height: 100%; }
+body { background: #424242; font-size: 18px; line-height: 1.64; }
+
+h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6, strong, b { font-family: 'Roboto', sans-serif !important; margin-bottom: 20px; }
+
+h1 { font-size: 114px; text-align: left; color: #FFFFFF; font-weight: 700; margin-bottom: 10px; }
+h2 { font-size: 114px; text-align: right; color: #000000; font-weight: 700; margin-bottom: 10px; }
+h3 { font-size: 30px; text-align: left; }
+h4 { font-size: 24px; text-align: left; }
+
+p.lead { text-align: center; color: #FFFFFF; }
+p.lead a { color: #FFFFFF; text-decoration: underline; }
+p.lead2 { text-align: left; color: #FFFFFF; }
+p.lead3 { text-align: right; color: #000000; }
+
+p.lead a:hover { text-decoration: none; }
+ul.no-bullets { list-style-type: none; margin: 0px; padding: 0px; }
+hr { margin: 40px 0px; border-color: #727878; opacity: 0.2; filter:alpha(opacity=20); }
+
+a:link { color: white; }
+a:hover { color: white; }
+a:active { color: white; }
+a:visited { color: white; }
+
+.modal-content {
+	background-color:#424242;
+    overflow:hidden;
+}
+
+.custom-list{ 
+	list-style-type: none; 
+    padding-left: 0;
+}
+
+.category-label{ font-weight: bold; } 
+.custom-list-label{ font-weight:bold; } 
+.custom-list-item{  }
+
+.about-text {
+	text-align: left;
+ }
+.quote-text {
+	text-align: center;
+ }
+.background-darkgray { background: #212121; }
+.background-darkbluegray { background: #424242; }
+.background-gray { background: #434242; }
+.background-blue { background: #0D47A1; }
+.background-sky { background: #0d47a1; }
+.background-white { background: #FFFFFF; }
+.background-black { background: #000000; }
+
+
+.image-logo { 
+  display: block;
+    margin-left: auto;
+    margin-right: auto; 
+}
+.image-center { text-align: center; }
+.text-center { text-align:center; }
+
+
+.gallery-row {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 0 4px;
+}
+
+/* Create four equal columns that sits next to each other */
+.gallery-column {
+  flex: 33%;
+  max-width: 33%;
+  padding: 0 4px;
+}
+
+.gallery-column img {
+  margin-top: 8px;
+  vertical-align: middle;
+  width: 100%;
+}
+
+/* Responsive layout - makes a two column-layout instead of four columns */
+@media screen and (max-width: 800px) {
+  .gallery-column {
+    flex: 50%;
+    max-width: 50%;
+  }
+}
+
+/* Responsive layout - makes the two columns stack on top of each other instead of next to each other */
+@media screen and (max-width: 600px) {
+  .gallery-column {
+    flex: 100%;
+    max-width: 100%;
+  }
+}
