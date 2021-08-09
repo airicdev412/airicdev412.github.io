@@ -43,7 +43,7 @@ a:visited { color: white; }
  }
 
 .background-customimage {
-  background-image: url('../images/sakura_5.png');
+  background-image: url('../images/light.png');
   background-position: center;
   height: 100vh;  
 }
