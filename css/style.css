@@ -58,8 +58,8 @@ a:visited { color: white; }
 
 .image-logo { 
   display: block;
-    margin-left: auto;
-    margin-right: auto; 
+  margin-left: auto;
+  margin-right: auto; 
 }
 .image-center { text-align: center; }
 .text-center { text-align:center; }
