@@ -39,11 +39,11 @@ a:visited { color: white; }
 	text-align: left;
  }
 .quote-text {
-	text-align: center;
+	text-align: center; font-size: 22px;
  }
 
 .background-customimage {
-  background-image: url('../images/airflow_2.png');
+  background-image: url('../images/airflow_3.png');
   background-position: center;
   height: 100vh;  
 }
