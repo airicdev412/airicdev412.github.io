@@ -1,5 +1,5 @@
 html, body { color: #FFFFFF; font-family: 'Roboto', sans-serif !important; height: 100%; }
-body { background: #424242; font-size: 14px; line-height: 1.64; }
+body { background: #212121; font-size: 14px; line-height: 1.64; }
 
 h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6, strong, b { font-family: 'Roboto', sans-serif !important; margin-bottom: 20px; }
 h1, h2, h3, h4 { font-weight: 300; color: #FFFFFF; }
@@ -43,8 +43,10 @@ a:visited { color: white; }
  }
 
 .background-customimage {
-  background-image: url('../images/airflow_3.png');
+  background-image: url('../images/bluesmoke.png');
   background-position: center;
+  background-repeat: repeat;
+  background-attachment: fixed;
   height: 100vh;  
 }
 .background-darkgray { background: #212121; }
