@@ -1,42 +1,54 @@
-<html lang="en" hc="delumine-smart " style="">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-	<link rel="icon" href="images/favicon.png">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<meta name="author" content="Airic Bourne">
-	<meta name="description" content="Personal Website for Airic Bourne">
-	<meta name="keywords" content="Airic Bourne, Air VR">
-	<meta name="robots" content="index, follow">
-	<title>Airic Bourne</title>
-	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
-	<link href="https://fonts.googleapis.com/css?family=Roboto:300,600,700" rel="stylesheet" type="text/css">
-	<link href="css/style.css" rel="stylesheet">
-	<link href="css/slider.css" rel="stylesheet" type="text/css">
-	<script src="js/tabs.js" defer></script>
-	<link href="css/tabs.css" rel="stylesheet" type="text/css">
-	<link href="css/glitch.css" rel="stylesheet" type="text/css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#030507">
+  <meta name="author" content="Airic Bourne">
+  <meta name="description" content="From the clouds to the unknown. An interactive flight by Airic Bourne.">
+  <meta property="og:title" content="AIR — Beyond the clouds">
+  <meta property="og:description" content="From the clouds to the unknown.">
+  <meta property="og:image" content="images/airlogo_512.png">
+  <title>AIR — Beyond the clouds</title>
+  <link rel="icon" href="images/favicon.png">
+  <link rel="stylesheet" href="css/flight.css">
 </head>
-
 <body>
-	<div class="background-customimage">
-		<div class="container-fluid">
-	        <div class="row">
-	            <div class="col-md-12">
-	            	<div class="container-fluid">
-						<div class="row vh-100 align-items-center">
-				            <div class="col-md-5">
-				            </div>
-							<div class="col-md-2">	
-	            				<a href="https://store.steampowered.com/app/1551370/AIR_VR/"><img src="images/airlogo_512.png" width ="100%"></a>
-							</div>
-				            <div class="col-md-5">
-				            </div>
-						</div>
-					</div>
-	            </div>
-			</div>
-		</div>
-		<div id="deluminate_fullscreen_workaround" enabled="false" style="background-color: rgba(0, 0, 0, 0);"></div>
-		<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
-	</div>
+  <div class="world" aria-hidden="true">
+    <div class="world-fallback"></div>
+    <canvas id="flight"></canvas>
+    <div class="world-grain"></div>
+  </div>
+  <header class="masthead">
+    <a class="wordmark" href="#overview" aria-label="AIR, back to the beginning">AIR<span class="wordmark-dot"></span></a>
+    <span class="masthead-note">An open horizon.</span>
+    <button class="motion-toggle" type="button" aria-pressed="false" aria-label="Pause ambient animation">
+      <span class="pause-icon" aria-hidden="true"></span><span class="motion-label">Pause motion</span>
+    </button>
+  </header>
+  <main id="journey" aria-label="A flight above the clouds">
+    <section class="chapter" id="overview" aria-labelledby="overview-title">
+      <div class="sr-only"><h1 id="overview-title">Beyond the clouds</h1><p>Sunlit cloud towers fill the foreground beneath a deep blue sky. Scroll to move closer and begin the ascent.</p></div>
+    </section>
+    <section class="chapter" id="ignition" aria-labelledby="ignition-title">
+      <div class="sr-only"><h2 id="ignition-title">Break through</h2><p>Move closer as a rocket pushes a burst of round cloud puffs outward, trailing fire and particles. The camera holds alongside it.</p></div>
+    </section>
+    <section class="chapter" id="ascent" aria-labelledby="ascent-title">
+      <div class="sr-only"><h2 id="ascent-title">Into the unknown</h2><p>The camera pulls back to a wide daylight panorama. A small rocket climbs toward the upper right, leaving a long white plume above layers of clouds and a hazy blue horizon.</p></div>
+    </section>
+  </main>
+  <div class="scene-caption" aria-hidden="true"><span class="caption-kicker">01 / ABOVE THE CLOUDS</span><p class="caption-title">Beyond the clouds.</p></div>
+  <nav class="chapter-nav" aria-label="Flight chapters">
+    <a href="#overview" aria-label="01 — Above the clouds" aria-current="step"><span>01</span><i></i></a>
+    <a href="#ignition" aria-label="02 — Break through"><span>02</span><i></i></a>
+    <a href="#ascent" aria-label="03 — Into the unknown"><span>03</span><i></i></a>
+  </nav>
+  <footer class="flight-footer">
+    <span class="footer-note">AIRIC BOURNE <span>/</span> EXPLORATIONS</span>
+    <a class="scroll-cue" href="#ignition"><span class="scroll-line" aria-hidden="true"></span><span class="scroll-label">Scroll to ascend</span><span aria-hidden="true">↓</span></a>
+    <span class="journey-count" aria-hidden="true"><span id="chapter-number">01</span> <span class="count-divider">/</span> 03</span>
+  </footer>
+  <noscript><p class="fallback-message">Beyond the clouds. Enable JavaScript to explore the interactive flight.</p></noscript>
+  <script type="module" src="js/flight.js"></script>
 </body>
 </html>
