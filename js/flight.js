@@ -93,7 +93,7 @@ function initialize() {
   }
   const backgroundScene=copyScene(cloudTarget.texture);
   const foregroundScene=copyScene(frontTarget.texture,true);
-  let width=1,height=1,maxScroll=1,targetProgress=0,progress=0,time=0,last=0,lastCloud=-1;
+  let width=1,height=1,mastheadHeight=110,maxScroll=1,targetProgress=0,progress=0,time=0,last=0,lastCloud=-1;
   let resolutionScale=1,slowFrames=0,qualitySamples=0,qualityTotal=0;
   let currentChapter=-1;
   let dirty=true;
@@ -109,8 +109,8 @@ function initialize() {
     {p:.25,camera:[-1,15,21],target:[-1,13,0],rocket:[-2.8,10,0],tilt:.28},
     {p:.38,camera:[.5,20,10],target:[0,18,0],rocket:[0,18,0],tilt:.34},
     {p:.54,camera:[4,28,12],target:[4,25,0],rocket:[4,25,0],tilt:.42},
-    {p:.80,camera:[0,100,245],target:[0,-10,-30],rocket:[48,104,0],tilt:.36},
-    {p:1,camera:[0,100,245],target:[0,-10,-30],rocket:[48,104,0],tilt:.36},
+    {p:.80,camera:[0,100,245],target:[0,25,-30],rocket:[48,104,0],tilt:.36},
+    {p:1,camera:[0,100,245],target:[0,25,-30],rocket:[48,104,0],tilt:.36},
   ];
   function sizeTargets() {
     // Cloud pixels are budgeted separately so the rocket stays crisp on retina screens.
@@ -122,6 +122,8 @@ function initialize() {
   }
   function resize() {
     width=innerWidth; height=innerHeight;
+    mastheadHeight=document.querySelector('.masthead').getBoundingClientRect().height;
+    cloudMaterial.uniforms.uSkyBand.value.set(mastheadHeight/height,clamp(height*.18,100,180)/height);
     renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.6));
     renderer.setSize(width,height,false);
     camera.aspect=width/height; camera.fov=width<600 ? 57 : 46; camera.updateProjectionMatrix();
@@ -148,7 +150,8 @@ function initialize() {
     // A small subject above a long diagonal plume, as in clouds3.jpg.
     rocketScreen.copy(rocket.rig.position).project(camera);
     rocketScreen.x=lerp(rocketScreen.x,width<600 ? .48 : .36,framing);
-    rocketScreen.y=lerp(rocketScreen.y,.76,framing);
+    // Keep the wide-view rocket below the shared header band on short screens too.
+    rocketScreen.y=lerp(rocketScreen.y,1-2*Math.max(.12,(mastheadHeight+24)/height),framing);
     rocket.rig.position.copy(rocketScreen.unproject(camera));
     const rocketScale=lerp(1,.85,panorama);
     rocket.rig.scale.setScalar(rocketScale);

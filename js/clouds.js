@@ -26,6 +26,7 @@ export function createCloudMaterial() {
       uCameraMatrix: { value: new THREE.Matrix4() },
       uAspect: { value: 1 }, uTanFov: { value: .45 },
       uResolution: { value: new THREE.Vector2() },
+      uSkyBand: { value: new THREE.Vector2(.14, .18) },
       uForeground: { value: false }, uCutoff: { value: 1000 },
       uBurst: { value: -1 },
       uPanorama: { value: 0 }, uEarthRadius: { value: 1400 },
@@ -37,7 +38,7 @@ export function createCloudMaterial() {
       varying vec2 vUv;
       uniform sampler2D uNoise;
       uniform float uTime, uAspect, uTanFov, uCutoff, uBurst, uPanorama, uEarthRadius;
-      uniform vec2 uResolution;
+      uniform vec2 uResolution, uSkyBand;
       uniform vec3 uCamera;
       uniform mat4 uCameraMatrix;
       uniform bool uForeground;
@@ -92,12 +93,12 @@ export function createCloudMaterial() {
         float distanceFade = smoothstep(70., 240., length(p.xz));
         float weather = noise3(vec3(plane.x * .009, 4.3, plane.y * .009));
         float weatherCoverage = smoothstep(mix(.08, .32, distanceFade), mix(.23, .52, distanceFade), weather);
-        // Keep a generous cloud sea beneath the wide daylight view.
-        weatherCoverage = mix(weatherCoverage, smoothstep(.42, .64, weather), uPanorama);
+        // Overlapping banks leave only small openings in the panorama cloud sea.
+        weatherCoverage = mix(weatherCoverage, mix(.7, 1., smoothstep(.22, .46, weather)), uPanorama);
         float detail = mix(fbm(p * .55), .48, uPanorama * .65);
         vec3 turbulence = vec3(noise3(p * .23), noise3(p * .23 + 31.), noise3(p * .23 + 67.)) - .5;
-        // A low connected deck closes the gaps in the opening cloud sea.
-        float deck = (1. - smoothstep(3., 6.5, h + detail * 2.)) * weatherCoverage * .8 * (1. - uPanorama);
+        // Retain a connected lower deck beneath the taller panorama billows.
+        float deck = (1. - smoothstep(3., mix(6.5, 8., uPanorama), h + detail * 2.)) * weatherCoverage * .8;
         // Check neighboring centers so clusters can be irregularly spaced without
         // clipping at tile boundaries or lining up into visible rows.
         for (int cx = 0; cx < 2; cx++) for (int cz = 0; cz < 2; cz++) {
@@ -109,13 +110,14 @@ export function createCloudMaterial() {
           local = mat2(cos(angle), -sin(angle), sin(angle), cos(angle)) * local;
           float scale = mix(.85, 1.5, hash(cell + 7.));
           float cloudHeight = 4. + hash(cell + 27.) * 3.;
-          vec3 q = vec3(local.x, h - cloudHeight, local.y) / scale + turbulence * 1.7;
+          vec3 puffScale = mix(vec3(1.), vec3(1.15, 1.45, 1.15), uPanorama);
+          vec3 q = vec3(local.x, h - cloudHeight, local.y) / (scale * puffScale) + turbulence * 1.7;
           float shape = puffShape(q) + (detail - .48) * .48;
-          float coverage = weatherCoverage * smoothstep(mix(.0, .22, distanceFade), mix(.06, .43, distanceFade), seed);
+          float coverage = weatherCoverage * smoothstep(mix(.0, .22, distanceFade * (1. - uPanorama)), mix(.06, .43, distanceFade * (1. - uPanorama)), seed);
           float candidate = (1. - smoothstep(-.10, .055, shape)) * coverage * 1.35;
           if (candidate > deck) {
             deck = candidate;
-            normal = puffNormal(q);
+            normal = normalize(puffNormal(q) / puffScale);
             normal.xz = mat2(cos(angle), sin(angle), -sin(angle), cos(angle)) * normal.xz;
           }
         }
@@ -185,7 +187,7 @@ export function createCloudMaterial() {
           vec3 p = ro + rd * sheet.x;
           vec3 q = vec3(p.x*.009, 12., p.z*.016);
           float weather = fbm(q);
-          float coverage = smoothstep(.43,.60,weather);
+          float coverage = smoothstep(.30,.48,weather);
           float detail = noise3(q*4. + 21.);
           vec3 white = mix(vec3(.44,.60,.74),vec3(.91,.94,.95),smoothstep(.42,.70,weather) * .65 + detail*.25);
           white = mix(white,vec3(.43,.57,.70),1.-exp(-sheet.x*.0007));
@@ -232,13 +234,17 @@ export function createCloudMaterial() {
             t += d > .002 ? stepSize : max(.8, stepSize);
           }
         }
+        // Screen-space height keeps the black sky aligned with the masthead
+        // as the camera changes altitude; smoothstep preserves the soft fade.
+        float skyFade = smoothstep(uSkyBand.x, uSkyBand.x + uSkyBand.y, 1. - vUv.y);
         if (uForeground) {
-          gl_FragColor = vec4(pow(max(cloud.rgb / max(cloud.a, .001), vec3(0.)), vec3(.4545)), cloud.a);
+          gl_FragColor = vec4(pow(max(cloud.rgb / max(cloud.a, .001), vec3(0.)), vec3(.4545)), cloud.a * skyFade);
         } else {
           vec3 color = cloud.rgb + base * (1. - cloud.a);
           color = pow(max(color, vec3(0.)), vec3(.4545));
           // Subtle lens falloff, with white highlights kept neutral.
           color *= 1. - .09 * pow(length(vUv - .5), 1.4);
+          color = mix(vec3(3., 5., 7.) / 255., color, skyFade);
           gl_FragColor = vec4(color, 1.);
         }
       }
