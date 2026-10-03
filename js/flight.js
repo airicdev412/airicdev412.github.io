@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three.module.min.js';
-import { createCloudMaterial } from './clouds.js';
+import { createCloudMaterial, createCloudAtlas } from './clouds.js';
 import { createRocket, createExhaust } from './rocket.js';
 
 const canvas = document.querySelector('#flight');
@@ -63,12 +63,13 @@ function initialize() {
   const rocket=createRocket(); scene.add(rocket.rig);
   const exhaust=createExhaust(innerWidth<600 ? 300 : 420); scene.add(exhaust.points);
   const cloudMaterial=createCloudMaterial();
+  const cloudAtlas=createCloudAtlas(renderer,cloudMaterial);
   const quadCamera=new THREE.Camera();
   const cloudScene=new THREE.Scene();
   const quadGeometry=new THREE.PlaneGeometry(2,2);
   cloudScene.add(new THREE.Mesh(quadGeometry,cloudMaterial));
-  const cloudTarget=new THREE.WebGLRenderTarget(1,1,{depthBuffer:false});
-  const frontTarget=new THREE.WebGLRenderTarget(1,1,{depthBuffer:false});
+  // Capture the background and rocket occlusion in one volume traversal.
+  const cloudTarget=new THREE.WebGLRenderTarget(1,1,{depthBuffer:false,count:2});
   function copyScene(texture,transparent=false) {
     const s=new THREE.Scene();
     s.add(new THREE.Mesh(quadGeometry,new THREE.ShaderMaterial({
@@ -92,11 +93,13 @@ function initialize() {
     return s;
   }
   const backgroundScene=copyScene(cloudTarget.texture);
-  const foregroundScene=copyScene(frontTarget.texture,true);
+  const foregroundScene=copyScene(cloudTarget.textures[1],true);
   let width=1,height=1,mastheadHeight=110,maxScroll=1,targetProgress=0,progress=0,time=0,last=0,lastCloud=-1;
   let resolutionScale=1,slowFrames=0,qualitySamples=0,qualityTotal=0;
   let currentChapter=-1;
   let dirty=true;
+  const lastCloudCamera=new THREE.Matrix4();
+  let lastCloudBurst=-1,lastCloudPanorama=-1,lastForeground=false;
   const lookAt=new THREE.Vector3();
   const direction=new THREE.Vector3();
   const up=new THREE.Vector3(0,1,0);
@@ -116,14 +119,13 @@ function initialize() {
     // Cloud pixels are budgeted separately so the rocket stays crisp on retina screens.
     const scale=Math.min(.85,Math.sqrt(320000/(width*height)))*resolutionScale;
     cloudTarget.setSize(Math.max(1,Math.round(width*scale)),Math.max(1,Math.round(height*scale)));
-    frontTarget.setSize(cloudTarget.width,cloudTarget.height);
     cloudMaterial.uniforms.uResolution.value.set(cloudTarget.width,cloudTarget.height);
     dirty=true;
   }
   function resize() {
     width=innerWidth; height=innerHeight;
     mastheadHeight=document.querySelector('.masthead').getBoundingClientRect().height;
-    cloudMaterial.uniforms.uSkyBand.value.set(mastheadHeight/height,clamp(height*.18,100,180)/height);
+    cloudMaterial.uniforms.uSkyBand.value.set(mastheadHeight*.5/height,clamp(height*.09,50,90)/height);
     renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.6));
     renderer.setSize(width,height,false);
     camera.aspect=width/height; camera.fov=width<600 ? 57 : 46; camera.updateProjectionMatrix();
@@ -133,7 +135,7 @@ function initialize() {
   }
   function onScroll() {
     targetProgress=clamp(scrollY/maxScroll,0,1);
-    dirty=true; requestRender();
+    requestRender();
   }
   function setVector(vector,a,b,t) { vector.set(lerp(a[0],b[0],t),lerp(a[1],b[1],t),lerp(a[2],b[2],t)); }
   function pose(p) {
@@ -171,7 +173,7 @@ function initialize() {
     const length=lerp(12,300,panorama);
     exhaust.material.uniforms.uPanorama.value=panorama;
     exhaust.material.uniforms.uPointScale.value=lerp(280,height/(2*Math.tan(THREE.MathUtils.degToRad(camera.fov)*.5)),panorama);
-    for(let i=0;i<exhaust.count;i++) {
+    for(let i=0;rocket.rig.visible&&i<exhaust.count;i++) {
       // The wide plume stays attached to the flight path; only its billows drift.
       const phase=(i/exhaust.count+time*lerp(.13,.012,panorama))%1;
       const age=Math.pow(phase,lerp(1,1.4,panorama));
@@ -185,9 +187,11 @@ function initialize() {
       exhaust.sizes[i]=lerp((.08+age*2.2)*spread,(1.1+Math.pow(age,.65)*9)*(1+jitter*.18),panorama);
       exhaust.alphas[i]=lerp((1-age)*.3*smooth(0,.08,age),.85*smooth(0,.015,age)*(1-smooth(.82,1,age)),panorama);
     }
-    exhaust.points.geometry.attributes.position.needsUpdate=true;
-    exhaust.points.geometry.attributes.aSize.needsUpdate=true;
-    exhaust.points.geometry.attributes.aAlpha.needsUpdate=true;
+    if(rocket.rig.visible) {
+      exhaust.points.geometry.attributes.position.needsUpdate=true;
+      exhaust.points.geometry.attributes.aSize.needsUpdate=true;
+      exhaust.points.geometry.attributes.aAlpha.needsUpdate=true;
+    }
     const uniforms=cloudMaterial.uniforms;
     uniforms.uTime.value=time;
     // The burst follows the camera timeline in both scroll directions.
@@ -224,29 +228,38 @@ function initialize() {
     if(document.hidden||failed)return;
     const elapsed=last ? Math.min((now-last)/1000,.1) : .016;
     last=now;
-    const previous=progress;
     if(reduced) {
       progress=targetProgress<.25 ? 0 : targetProgress<.75 ? .5 : 1;
     } else progress=lerp(progress,targetProgress,1-Math.exp(-elapsed*9));
     if(Math.abs(progress-targetProgress)<.00005&&!reduced) progress=targetProgress;
     if(!paused) time+=elapsed;
     pose(progress); updateUI(progress);
-    const moving=Math.abs(progress-previous)>.00001;
     const foreground=progress>.15&&progress<.38;
+    const uniforms=cloudMaterial.uniforms;
+    // Scroll continues through the final hold, but the cloud view is unchanged.
+    const viewChanged=!lastCloudCamera.equals(camera.matrixWorld)||
+      lastCloudBurst!==uniforms.uBurst.value||lastCloudPanorama!==uniforms.uPanorama.value||
+      lastForeground!==foreground;
     // At rest the drifting cloud volume runs at 24 fps, while the mesh stays smooth.
-    if(dirty||moving||now-lastCloud>1000/24) {
-      cloudMaterial.uniforms.uForeground.value=false;
+    const updateClouds=dirty||viewChanged||(!paused&&now-lastCloud>1000/24);
+    if(updateClouds) {
+      cloudMaterial.uniforms.uForeground.value=foreground;
       renderer.setRenderTarget(cloudTarget); renderer.clear(); renderer.render(cloudScene,quadCamera);
-      if(foreground) {
-        cloudMaterial.uniforms.uForeground.value=true;
-        renderer.setRenderTarget(frontTarget); renderer.clear(); renderer.render(cloudScene,quadCamera);
-      }
+      lastCloudCamera.copy(camera.matrixWorld);
+      lastCloudBurst=uniforms.uBurst.value; lastCloudPanorama=uniforms.uPanorama.value;
+      lastForeground=foreground;
       lastCloud=now; dirty=false;
     }
-    renderer.setRenderTarget(null); renderer.clear();
-    renderer.render(backgroundScene,quadCamera);
-    renderer.clearDepth(); renderer.render(scene,camera);
-    if(foreground) renderer.render(foregroundScene,quadCamera);
+    // Before ignition only the clouds are visible; an unchanged cloud texture
+    // needs no additional full-resolution composition or invisible exhaust work.
+    if(updateClouds||rocket.rig.visible) {
+      renderer.setRenderTarget(null); renderer.clear();
+      renderer.render(backgroundScene,quadCamera);
+      if(rocket.rig.visible) {
+        renderer.clearDepth(); renderer.render(scene,camera);
+      }
+      if(foreground) renderer.render(foregroundScene,quadCamera);
+    }
     if(!document.body.classList.contains('is-ready')&&!failed)document.body.classList.add('is-ready');
     // Lower volume resolution after sustained frame pressure, never above the initial budget.
     if(!paused && !reduced && qualitySamples<180) {
@@ -266,6 +279,6 @@ function initialize() {
     if(document.hidden){cancelAnimationFrame(frame);frame=0;}else{last=0;dirty=true;requestRender();}
   });
   canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();fallback();});
-  canvas.addEventListener('webglcontextrestored',()=>{failed=false;document.body.classList.remove('is-fallback');document.querySelector('.fallback-message')?.remove();motionButton.hidden=false;resize();});
+  canvas.addEventListener('webglcontextrestored',()=>{failed=false;cloudAtlas.bake();document.body.classList.remove('is-fallback');document.querySelector('.fallback-message')?.remove();motionButton.hidden=false;resize();});
   resize();progress=targetProgress;requestRender();
 }

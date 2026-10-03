@@ -19,9 +19,11 @@ export function createCloudMaterial() {
   noise.minFilter = noise.magFilter = THREE.LinearFilter;
   noise.needsUpdate = true;
   return new THREE.ShaderMaterial({
+    glslVersion: THREE.GLSL3,
     depthTest: false, depthWrite: false,
     uniforms: {
       uNoise: { value: noise }, uTime: { value: 0 },
+      uCloudAtlas: { value: null },
       uCamera: { value: new THREE.Vector3() },
       uCameraMatrix: { value: new THREE.Matrix4() },
       uAspect: { value: 1 }, uTanFov: { value: .45 },
@@ -36,7 +38,9 @@ export function createCloudMaterial() {
     fragmentShader: `
       precision highp float;
       varying vec2 vUv;
-      uniform sampler2D uNoise;
+      layout(location = 0) out vec4 backgroundColor;
+      layout(location = 1) out vec4 foregroundColor;
+      uniform sampler2D uNoise, uCloudAtlas;
       uniform float uTime, uAspect, uTanFov, uCutoff, uBurst, uPanorama, uEarthRadius;
       uniform vec2 uResolution, uSkyBand;
       uniform vec3 uCamera;
@@ -86,7 +90,7 @@ export function createCloudMaterial() {
         float h = length(p - CENTER) - uEarthRadius;
         if (h < .8 || h > 32.) return 0.;
         vec2 drift = vec2(uTime * .085, uTime * .035);
-        vec2 plane = (p.xz + drift) * mix(vec2(1.), vec2(.34,.65), uPanorama);
+        vec2 plane = (p.xz + drift) * mix(vec2(1.), vec2(.65), uPanorama);
         // Broad domain warping breaks up regular rows without adding wispy noise.
         plane += (vec2(noise3(vec3(plane * .018, 3.)), noise3(vec3(plane * .018, 17.))) - .5) * 24.;
         vec2 baseCell = floor(plane / 24. - .5);
@@ -95,7 +99,7 @@ export function createCloudMaterial() {
         float weatherCoverage = smoothstep(mix(.08, .32, distanceFade), mix(.23, .52, distanceFade), weather);
         // Overlapping banks leave only small openings in the panorama cloud sea.
         weatherCoverage = mix(weatherCoverage, mix(.7, 1., smoothstep(.22, .46, weather)), uPanorama);
-        float detail = mix(fbm(p * .55), .48, uPanorama * .65);
+        float detail = fbm(p * .55);
         vec3 turbulence = vec3(noise3(p * .23), noise3(p * .23 + 31.), noise3(p * .23 + 67.)) - .5;
         // Retain a connected lower deck beneath the taller panorama billows.
         float deck = (1. - smoothstep(3., mix(6.5, 8., uPanorama), h + detail * 2.)) * weatherCoverage * .8;
@@ -110,7 +114,7 @@ export function createCloudMaterial() {
           local = mat2(cos(angle), -sin(angle), sin(angle), cos(angle)) * local;
           float scale = mix(.85, 1.5, hash(cell + 7.));
           float cloudHeight = 4. + hash(cell + 27.) * 3.;
-          vec3 puffScale = mix(vec3(1.), vec3(1.15, 1.45, 1.15), uPanorama);
+          vec3 puffScale = mix(vec3(1.), vec3(1., 1.5, 1.), uPanorama);
           vec3 q = vec3(local.x, h - cloudHeight, local.y) / (scale * puffScale) + turbulence * 1.7;
           float shape = puffShape(q) + (detail - .48) * .48;
           float coverage = weatherCoverage * smoothstep(mix(.0, .22, distanceFade * (1. - uPanorama)), mix(.06, .43, distanceFade * (1. - uPanorama)), seed);
@@ -163,6 +167,40 @@ export function createCloudMaterial() {
         float s = sqrt(d);
         return vec2(-b - s, -b + s);
       }
+      // Four fixed world-space rows of cloud cards, sampled back to front.
+      // Each card uses a one-time bake of the same rounded, lit cloud lobes.
+      vec3 distantClouds(vec3 col, vec3 ro, vec3 rd) {
+        if (uPanorama <= 0. || rd.z >= -.01) return col;
+        for (int row = 3; row >= 0; row--) {
+          float layer = float(row);
+          float z = row == 0 ? -25. : row == 1 ? -280. : row == 2 ? -750. : -1600.;
+          float t = (z - ro.z) / rd.z;
+          if (t <= 0.) continue;
+          vec3 p = ro + rd * t;
+          float spacing = 42. + layer * 8.;
+          float drift = uTime * .085;
+          float cell = floor((p.x + drift) / spacing);
+          // Overlap neighboring cards so the banks do not read as isolated stamps.
+          for (int neighbor = 0; neighbor < 2; neighbor++) {
+            float id = cell + float(neighbor);
+            float seed = hash(vec2(id, layer + 51.));
+            float center = id * spacing + (seed - .5) * spacing * .3;
+            float height = 44. * mix(.85, 1.25, seed);
+            float base = 5. - height * .3 - (z * z + center * center) / (2. * uEarthRadius);
+            // Keep each card within its two-cell neighborhood, including jitter.
+            float width = min(height * 1.8, spacing * 1.65);
+            vec2 uv = vec2((p.x + drift - center) / width + .5, (p.y - base) / height);
+            if (uv.x <= 0. || uv.x >= 1. || uv.y <= 0. || uv.y >= 1.) continue;
+            float variant = floor(seed * 4.);
+            vec4 card = texture2D(uCloudAtlas, vec2((uv.x + variant) * .25, uv.y));
+            float haze = 1. - exp(-t * .0025);
+            vec3 shade = mix(card.rgb, vec3(.36,.54,.72), haze * .82);
+            float opacity = card.a * smoothstep(.12, .32, uv.y) * smoothstep(180., 280., t) * uPanorama;
+            col = mix(col, shade, opacity);
+          }
+        }
+        return col;
+      }
       vec3 background(vec3 ro, vec3 rd) {
         float radius = length(ro - CENTER);
         float horizon = dot(normalize(ro - CENTER), rd) + sqrt(max(0., 1. - pow((uEarthRadius + 16.) / radius, 2.)));
@@ -187,26 +225,35 @@ export function createCloudMaterial() {
           vec3 p = ro + rd * sheet.x;
           vec3 q = vec3(p.x*.009, 12., p.z*.016);
           float weather = fbm(q);
-          float coverage = smoothstep(.30,.48,weather);
+          // A connected deck keeps the distant cards seated in cloud cover.
+          float coverage = mix(.88, 1., smoothstep(.30,.48,weather));
           float detail = noise3(q*4. + 21.);
           vec3 white = mix(vec3(.44,.60,.74),vec3(.91,.94,.95),smoothstep(.42,.70,weather) * .65 + detail*.25);
           white = mix(white,vec3(.43,.57,.70),1.-exp(-sheet.x*.0007));
           col = mix(col,white,coverage*uPanorama);
         }
-        return col;
+        return distantClouds(col, ro, rd);
       }
       void main() {
+        float skyFade = smoothstep(uSkyBand.x, uSkyBand.x + uSkyBand.y, 1. - vUv.y);
+        foregroundColor = vec4(0.);
+        // The opaque upper sky band hides all scene detail here.
+        if (skyFade == 0.) {
+          backgroundColor = vec4(vec3(3., 5., 7.) / 255., 1.);
+          return;
+        }
         vec2 xy = (vUv * 2. - 1.) * vec2(uAspect, 1.) * uTanFov;
         vec3 rd = normalize((uCameraMatrix * vec4(xy, -1., 0.)).xyz);
         vec3 base = background(uCamera, rd);
         vec2 outer = sphere(uCamera, rd, uEarthRadius + 32.);
         vec4 cloud = vec4(0.);
+        vec4 front = vec4(0.);
         if (outer.y > 0.) {
           float start = max(0., outer.x);
-          float end = min(outer.y, mix(1100., 2600., uPanorama));
+          // Distant rays skip density and lighting probes entirely in the panorama.
+          float end = min(outer.y, mix(1100., 320., uPanorama));
           vec2 inner = sphere(uCamera, rd, uEarthRadius + .8);
           if (inner.x > 0.) end = min(end, inner.x);
-          if (uForeground) end = min(end, uCutoff);
           float t = start + hash(gl_FragCoord.xy) * max(.18, start * .012);
           for (int i = 0; i < 112; i++) {
             if (t > end || cloud.a > .985) break;
@@ -214,6 +261,7 @@ export function createCloudMaterial() {
             vec3 p = uCamera + rd * t;
             vec3 normal;
             float d = density(p, normal);
+            d *= 1. - uPanorama * smoothstep(220., 320., t);
             if (d > .002) {
               // One sunward density probe shades the small billows as well as the
               // large lobes, with blue skylight retained inside the shadows.
@@ -230,24 +278,77 @@ export function createCloudMaterial() {
               cloud.rgb += (1. - cloud.a) * a * shade;
               cloud.a += (1. - cloud.a) * a;
             }
+            // Both layers follow identical rays. Save the accumulated volume
+            // in front of the rocket instead of marching the same ray twice.
+            if (uForeground && t <= uCutoff) front = cloud;
             // Traverse empty air quickly, then take fine samples inside a bank.
             t += d > .002 ? stepSize : max(.8, stepSize);
           }
         }
-        // Screen-space height keeps the black sky aligned with the masthead
+        // Screen-space height keeps the black sky at half the masthead height
         // as the camera changes altitude; smoothstep preserves the soft fade.
-        float skyFade = smoothstep(uSkyBand.x, uSkyBand.x + uSkyBand.y, 1. - vUv.y);
         if (uForeground) {
-          gl_FragColor = vec4(pow(max(cloud.rgb / max(cloud.a, .001), vec3(0.)), vec3(.4545)), cloud.a * skyFade);
-        } else {
-          vec3 color = cloud.rgb + base * (1. - cloud.a);
-          color = pow(max(color, vec3(0.)), vec3(.4545));
-          // Subtle lens falloff, with white highlights kept neutral.
-          color *= 1. - .09 * pow(length(vUv - .5), 1.4);
-          color = mix(vec3(3., 5., 7.) / 255., color, skyFade);
-          gl_FragColor = vec4(color, 1.);
+          foregroundColor = vec4(pow(max(front.rgb / max(front.a, .001), vec3(0.)), vec3(.4545)), front.a * skyFade);
         }
+        vec3 color = cloud.rgb + base * (1. - cloud.a);
+        color = pow(max(color, vec3(0.)), vec3(.4545));
+        // Subtle lens falloff, with white highlights kept neutral.
+        color *= 1. - .09 * pow(length(vUv - .5), 1.4);
+        color = mix(vec3(3., 5., 7.) / 255., color, skyFade);
+        backgroundColor = vec4(color, 1.);
       }
     `,
   });
+}
+
+// Bake four reusable cloud silhouettes once, rather than marching distant
+// volumes every frame. The atlas stays on the GPU and needs no image downloads.
+export function createCloudAtlas(renderer, cloudMaterial) {
+  const target = new THREE.WebGLRenderTarget(768, 192, { depthBuffer: false });
+  const prefix = cloudMaterial.fragmentShader.split('      void main() {')[0]
+    .replace('layout(location = 1) out vec4 foregroundColor;', '');
+  const material = new THREE.ShaderMaterial({
+    glslVersion: THREE.GLSL3,
+    depthTest: false, depthWrite: false,
+    uniforms: { uNoise: cloudMaterial.uniforms.uNoise },
+    vertexShader: cloudMaterial.vertexShader,
+    fragmentShader: prefix + `
+      void main() {
+        float variant = floor(vUv.x * 4.);
+        vec2 uv = vec2(fract(vUv.x * 4.), vUv.y);
+        vec3 ro = vec3((uv.x - .5) * 28., uv.y * 20. - 6., 20.);
+        vec4 cloud = vec4(0.);
+        for (int i = 0; i < 100; i++) {
+          if (cloud.a > .99) break;
+          vec3 p = ro - vec3(0., 0., float(i) * .4);
+          vec3 noisePoint = p + variant * 31.;
+          vec3 turbulence = vec3(noise3(noisePoint * .23), noise3(noisePoint * .23 + 31.), noise3(noisePoint * .23 + 67.)) - .5;
+          vec3 q = p + turbulence * 1.7;
+          float shape = puffShape(q) + (fbm(noisePoint * .55) - .48) * .48;
+          float d = (1. - smoothstep(-.10, .055, shape)) * 1.35;
+          if (d < .002) continue;
+          float light = smoothstep(-.55, .85, dot(puffNormal(q), SUN));
+          float shadow = (1. - smoothstep(-.10, .055, puffShape(q + SUN * 2.2))) * 1.35;
+          vec3 shade = mix(vec3(.28,.49,.63), vec3(1.,1.,.98), light * .38 + exp(-shadow * 1.4) * .62);
+          shade += vec3(.045,.055,.06) * smoothstep(3.,16.,p.y + 6.);
+          float a = 1. - exp(-d * .4 * 1.35);
+          cloud.rgb += (1. - cloud.a) * a * shade;
+          cloud.a += (1. - cloud.a) * a;
+        }
+        backgroundColor = vec4(cloud.rgb / max(cloud.a, .001), cloud.a);
+      }`,
+  });
+  const geometry = new THREE.PlaneGeometry(2, 2);
+  const scene = new THREE.Scene();
+  scene.add(new THREE.Mesh(geometry, material));
+  const camera = new THREE.Camera();
+  const bake = () => {
+    const previous = renderer.getRenderTarget();
+    renderer.setRenderTarget(target);
+    renderer.render(scene, camera);
+    renderer.setRenderTarget(previous);
+  };
+  bake();
+  cloudMaterial.uniforms.uCloudAtlas.value = target.texture;
+  return { bake };
 }
