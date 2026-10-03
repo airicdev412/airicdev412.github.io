@@ -99,8 +99,12 @@ export function createCloudMaterial() {
         float weatherCoverage = smoothstep(mix(.08, .32, distanceFade), mix(.23, .52, distanceFade), weather);
         // Overlapping banks leave only small openings in the panorama cloud sea.
         weatherCoverage = mix(weatherCoverage, mix(.7, 1., smoothstep(.22, .46, weather)), uPanorama);
-        float detail = fbm(p * .55);
-        vec3 turbulence = vec3(noise3(p * .23), noise3(p * .23 + 31.), noise3(p * .23 + 67.)) - .5;
+        // Broader, quieter surface detail lets the panorama's large lobes read clearly.
+        float detail = fbm(p * mix(.55, .18, uPanorama));
+        vec3 noisePoint = p * mix(.23, .10, uPanorama);
+        vec3 turbulence = vec3(noise3(noisePoint), noise3(noisePoint + 31.), noise3(noisePoint + 67.)) - .5;
+        float warpStrength = mix(1.7, .9, uPanorama);
+        float detailStrength = mix(.48, .18, uPanorama);
         // Retain a connected lower deck beneath the taller panorama billows.
         float deck = (1. - smoothstep(3., mix(6.5, 8., uPanorama), h + detail * 2.)) * weatherCoverage * .8;
         // Check neighboring centers so clusters can be irregularly spaced without
@@ -114,9 +118,9 @@ export function createCloudMaterial() {
           local = mat2(cos(angle), -sin(angle), sin(angle), cos(angle)) * local;
           float scale = mix(.85, 1.5, hash(cell + 7.));
           float cloudHeight = 4. + hash(cell + 27.) * 3.;
-          vec3 puffScale = mix(vec3(1.), vec3(1., 1.5, 1.), uPanorama);
-          vec3 q = vec3(local.x, h - cloudHeight, local.y) / (scale * puffScale) + turbulence * 1.7;
-          float shape = puffShape(q) + (detail - .48) * .48;
+          vec3 puffScale = mix(vec3(1.), vec3(1.1, 1.35, 1.1), uPanorama);
+          vec3 q = vec3(local.x, h - cloudHeight, local.y) / (scale * puffScale) + turbulence * warpStrength;
+          float shape = puffShape(q) + (detail - .48) * detailStrength;
           float coverage = weatherCoverage * smoothstep(mix(.0, .22, distanceFade * (1. - uPanorama)), mix(.06, .43, distanceFade * (1. - uPanorama)), seed);
           float candidate = (1. - smoothstep(-.10, .055, shape)) * coverage * 1.35;
           if (candidate > deck) {
@@ -127,8 +131,8 @@ export function createCloudMaterial() {
         }
         // A permanent launch cloud anchors the disturbance to the rocket's path.
         vec3 origin = vec3(-2.8, 5.2, 0.);
-        vec3 launchPoint = vec3(p.x-origin.x,h-origin.y,p.z) + turbulence * 1.7;
-        float launch = (1. - smoothstep(-.10, .055, puffShape(launchPoint) + (detail - .48) * .48)) * 1.35;
+        vec3 launchPoint = vec3(p.x-origin.x,h-origin.y,p.z) + turbulence * warpStrength;
+        float launch = (1. - smoothstep(-.10, .055, puffShape(launchPoint) + (detail - .48) * detailStrength)) * 1.35;
         if (launch > deck) normal = puffNormal(launchPoint);
         deck = max(deck, launch);
         float burst = 0.;
@@ -254,10 +258,12 @@ export function createCloudMaterial() {
           float end = min(outer.y, mix(1100., 320., uPanorama));
           vec2 inner = sphere(uCamera, rd, uEarthRadius + .8);
           if (inner.x > 0.) end = min(end, inner.x);
-          float t = start + hash(gl_FragCoord.xy) * max(.18, start * .012);
+          // Smaller panorama steps resolve smooth lobe edges without noisy coverage.
+          float stepRate = mix(.012, .008, uPanorama);
+          float t = start + hash(gl_FragCoord.xy) * max(.18, start * stepRate);
           for (int i = 0; i < 112; i++) {
             if (t > end || cloud.a > .985) break;
-            float stepSize = max(.18, t * .012);
+            float stepSize = max(.18, t * stepRate);
             vec3 p = uCamera + rd * t;
             vec3 normal;
             float d = density(p, normal);
@@ -282,7 +288,7 @@ export function createCloudMaterial() {
             // in front of the rocket instead of marching the same ray twice.
             if (uForeground && t <= uCutoff) front = cloud;
             // Traverse empty air quickly, then take fine samples inside a bank.
-            t += d > .002 ? stepSize : max(.8, stepSize);
+            t += d > .002 ? stepSize : max(.8, t * .012);
           }
         }
         // Screen-space height keeps the black sky at half the masthead height
